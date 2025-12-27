@@ -57,8 +57,13 @@ impl EmailService {
         let from = format!("{} <{}>", self.config.from_name, self.config.from_email);
 
         let email = Message::builder()
-            .from(from.parse().map_err(|e| EmailError::BuildError(format!("{}", e)))?)
-            .to(to.parse().map_err(|e| EmailError::BuildError(format!("{}", e)))?)
+            .from(
+                from.parse()
+                    .map_err(|e| EmailError::BuildError(format!("{}", e)))?,
+            )
+            .to(to
+                .parse()
+                .map_err(|e| EmailError::BuildError(format!("{}", e)))?)
             .subject(subject)
             .header(ContentType::TEXT_HTML)
             .body(body)

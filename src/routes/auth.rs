@@ -27,7 +27,7 @@ use crate::db::{
 };
 use crate::models::{
     ApiError, ApiResponse, AuthData, AuthResponse, ForgotPasswordRequest, GoogleAuthRequest,
-    LoginRequest, RegisterRequest, ResetPasswordRequest, ResendVerificationRequest, User,
+    LoginRequest, RegisterRequest, ResendVerificationRequest, ResetPasswordRequest, User,
     VerifyEmailRequest,
 };
 use crate::routes::AppState;
@@ -475,9 +475,13 @@ pub async fn forgot_password(
         Ok(Some((user, _))) => user,
         Ok(None) => {
             // Return success even if user doesn't exist (security best practice)
-            info!("Password reset requested for non-existent email: {}", body.email);
-            return HttpResponse::Ok()
-                .json(ApiResponse::new("If the email exists, a password reset link has been sent".to_string()));
+            info!(
+                "Password reset requested for non-existent email: {}",
+                body.email
+            );
+            return HttpResponse::Ok().json(ApiResponse::new(
+                "If the email exists, a password reset link has been sent".to_string(),
+            ));
         }
         Err(e) => {
             error!("Failed to find user: {}", e);
@@ -495,22 +499,27 @@ pub async fn forgot_password(
     let token = Uuid::new_v4().to_string();
 
     // Create verification token (expires in 1 hour)
-    if let Err(e) = create_verification_token(pool, user.id, &token, TOKEN_TYPE_PASSWORD_RESET, 1).await {
+    if let Err(e) =
+        create_verification_token(pool, user.id, &token, TOKEN_TYPE_PASSWORD_RESET, 1).await
+    {
         error!("Failed to create password reset token: {}", e);
         return HttpResponse::InternalServerError()
             .json(ApiError::new("Failed to process request"));
     }
 
     // Send password reset email
-    if let Err(e) = email_service.send_password_reset_email(&body.email, &token).await {
+    if let Err(e) = email_service
+        .send_password_reset_email(&body.email, &token)
+        .await
+    {
         error!("Failed to send password reset email: {}", e);
-        return HttpResponse::InternalServerError()
-            .json(ApiError::new("Failed to send email"));
+        return HttpResponse::InternalServerError().json(ApiError::new("Failed to send email"));
     }
 
     info!("Password reset email sent to: {}", body.email);
-    HttpResponse::Ok()
-        .json(ApiResponse::new("If the email exists, a password reset link has been sent".to_string()))
+    HttpResponse::Ok().json(ApiResponse::new(
+        "If the email exists, a password reset link has been sent".to_string(),
+    ))
 }
 
 /// POST /api/auth/reset-password - Reset password with token
@@ -546,7 +555,8 @@ pub async fn reset_password(
     }
 
     if body.new_password.len() < 6 {
-        return HttpResponse::BadRequest().json(ApiError::new("Password must be at least 6 characters"));
+        return HttpResponse::BadRequest()
+            .json(ApiError::new("Password must be at least 6 characters"));
     }
 
     // Find the token
@@ -599,7 +609,10 @@ pub async fn reset_password(
         warn!("Failed to mark token as used: {}", e);
     }
 
-    info!("Password reset successful for user_id: {}", verification_token.user_id);
+    info!(
+        "Password reset successful for user_id: {}",
+        verification_token.user_id
+    );
     HttpResponse::Ok().json(ApiResponse::new("Password reset successful".to_string()))
 }
 
@@ -660,8 +673,7 @@ pub async fn verify_email(
     // Set email as verified
     if let Err(e) = set_email_verified(pool, verification_token.user_id, true).await {
         error!("Failed to verify email: {}", e);
-        return HttpResponse::InternalServerError()
-            .json(ApiError::new("Failed to verify email"));
+        return HttpResponse::InternalServerError().json(ApiError::new("Failed to verify email"));
     }
 
     // Mark token as used
@@ -719,9 +731,14 @@ pub async fn resend_verification(
         Ok(Some((user, _))) => user,
         Ok(None) => {
             // Return success even if user doesn't exist (security best practice)
-            info!("Verification email requested for non-existent email: {}", body.email);
-            return HttpResponse::Ok()
-                .json(ApiResponse::new("If the email exists and is not verified, a verification link has been sent".to_string()));
+            info!(
+                "Verification email requested for non-existent email: {}",
+                body.email
+            );
+            return HttpResponse::Ok().json(ApiResponse::new(
+                "If the email exists and is not verified, a verification link has been sent"
+                    .to_string(),
+            ));
         }
         Err(e) => {
             error!("Failed to find user: {}", e);
@@ -739,22 +756,27 @@ pub async fn resend_verification(
     let token = Uuid::new_v4().to_string();
 
     // Create verification token (expires in 24 hours)
-    if let Err(e) = create_verification_token(pool, user.id, &token, TOKEN_TYPE_EMAIL_VERIFICATION, 24).await {
+    if let Err(e) =
+        create_verification_token(pool, user.id, &token, TOKEN_TYPE_EMAIL_VERIFICATION, 24).await
+    {
         error!("Failed to create verification token: {}", e);
         return HttpResponse::InternalServerError()
             .json(ApiError::new("Failed to process request"));
     }
 
     // Send verification email
-    if let Err(e) = email_service.send_verification_email(&body.email, &token).await {
+    if let Err(e) = email_service
+        .send_verification_email(&body.email, &token)
+        .await
+    {
         error!("Failed to send verification email: {}", e);
-        return HttpResponse::InternalServerError()
-            .json(ApiError::new("Failed to send email"));
+        return HttpResponse::InternalServerError().json(ApiError::new("Failed to send email"));
     }
 
     info!("Verification email sent to: {}", body.email);
-    HttpResponse::Ok()
-        .json(ApiResponse::new("If the email exists and is not verified, a verification link has been sent".to_string()))
+    HttpResponse::Ok().json(ApiResponse::new(
+        "If the email exists and is not verified, a verification link has been sent".to_string(),
+    ))
 }
 
 /// Configure authentication routes

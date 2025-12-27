@@ -68,7 +68,6 @@ pub struct AddHistoryRequest {
     pub thumbnail: String,
 }
 
-
 /// POST /api/favorites - Add an anime to user's favorites
 ///
 /// Requires authentication via JWT token in Authorization header.
@@ -222,7 +221,6 @@ pub async fn remove_favorite_handler(
     }
 }
 
-
 /// POST /api/subscriptions - Subscribe to an anime series
 ///
 /// Requires authentication via JWT token in Authorization header.
@@ -373,7 +371,6 @@ pub async fn remove_subscription_handler(
         }
     }
 }
-
 
 /// POST /api/history - Record a watched episode
 ///

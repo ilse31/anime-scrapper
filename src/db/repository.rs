@@ -1860,7 +1860,10 @@ pub async fn is_email_verified(pool: &PgPool, user_id: i32) -> RepositoryResult<
     .await?;
 
     match row {
-        Some(row) => Ok(Some(row.get::<Option<bool>, _>("email_verified").unwrap_or(false))),
+        Some(row) => Ok(Some(
+            row.get::<Option<bool>, _>("email_verified")
+                .unwrap_or(false),
+        )),
         None => Ok(None),
     }
 }
@@ -2841,7 +2844,6 @@ mod tests {
             .expect("Failed to delete user");
     }
 
-
     #[tokio::test]
     #[ignore]
     async fn test_favorites_crud() {
@@ -2923,7 +2925,6 @@ mod tests {
             .expect("Failed to delete user");
     }
 
-
     #[tokio::test]
     #[ignore]
     async fn test_subscriptions_crud() {
@@ -3004,7 +3005,6 @@ mod tests {
             .await
             .expect("Failed to delete user");
     }
-
 
     #[tokio::test]
     #[ignore]

@@ -22,9 +22,8 @@ use crate::email::EmailService;
 use crate::models::{
     AnimeListFilters, AnimeListResponse, ApiError, ApiResponse, AuthData, AuthResponse,
     CrawledAnime, CrawledAnimeRecord, CrawlerData, CrawlerResponse, ForgotPasswordRequest,
-    GoogleAuthRequest, LoginRequest, RegisterRequest, ResetPasswordRequest,
-    ResendVerificationRequest, User, UserFavorite, UserHistory, UserSubscription,
-    VerifyEmailRequest,
+    GoogleAuthRequest, LoginRequest, RegisterRequest, ResendVerificationRequest,
+    ResetPasswordRequest, User, UserFavorite, UserHistory, UserSubscription, VerifyEmailRequest,
 };
 use crate::parser::{
     parse_anime_detail, parse_anime_list, parse_anime_updates, parse_completed_anime,
