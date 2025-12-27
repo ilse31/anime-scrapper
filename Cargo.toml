@@ -24,6 +24,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 utoipa = { version = "5", features = ["actix_extras", "chrono"] }
 utoipa-swagger-ui = { version = "8", features = ["actix-web"] }
+lettre = { version = "0.11", features = ["tokio1-native-tls", "builder", "smtp-transport"] }
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 actix-rt = "2"
