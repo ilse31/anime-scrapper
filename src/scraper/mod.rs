@@ -129,7 +129,8 @@ impl Scraper {
 
     /// Apply random delay between requests
     async fn apply_delay(&self) {
-        let delay = rand::thread_rng().gen_range(self.config.min_delay_ms..=self.config.max_delay_ms);
+        let delay =
+            rand::thread_rng().gen_range(self.config.min_delay_ms..=self.config.max_delay_ms);
         sleep(Duration::from_millis(delay)).await;
     }
 
@@ -142,7 +143,14 @@ impl Scraper {
 
     /// Get headers that match the user agent
     fn get_sec_ch_ua(&self, user_agent: &str) -> (&'static str, &'static str, &'static str) {
-        if user_agent.contains("Chrome/120") {
+        // Check for macOS first since Chrome version checks would match macOS Chrome too
+        if user_agent.contains("Macintosh") {
+            (
+                "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"",
+                "?0",
+                "\"macOS\"",
+            )
+        } else if user_agent.contains("Chrome/120") {
             (
                 "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"",
                 "?0",
@@ -159,12 +167,6 @@ impl Scraper {
                 "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Microsoft Edge\";v=\"120\"",
                 "?0",
                 "\"Windows\"",
-            )
-        } else if user_agent.contains("Macintosh") {
-            (
-                "\"Not_A Brand\";v=\"8\", \"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"",
-                "?0",
-                "\"macOS\"",
             )
         } else {
             // Firefox doesn't send Sec-Ch-Ua headers, but we'll use empty strings
@@ -203,7 +205,9 @@ impl Scraper {
             }
         }
 
-        Err(last_error.unwrap_or(ScraperError::NetworkError("Max retries exceeded".to_string())))
+        Err(last_error.unwrap_or(ScraperError::NetworkError(
+            "Max retries exceeded".to_string(),
+        )))
     }
 
     /// Internal fetch implementation
@@ -318,7 +322,7 @@ mod tests {
     #[test]
     fn test_sec_ch_ua_headers() {
         let scraper = Scraper::new();
-        
+
         // Chrome Windows
         let (ua, mobile, platform) = scraper.get_sec_ch_ua(USER_AGENTS[0]);
         assert!(ua.contains("Chrome"));

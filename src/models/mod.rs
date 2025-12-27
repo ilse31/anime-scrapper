@@ -295,7 +295,13 @@ pub struct CrawlerData {
 
 impl CrawlerResponse {
     /// Create a new crawler response with the current timestamp
-    pub fn new(total_crawled: i32, total_episodes: i32, total_video_sources: i32, pages_processed: i32, errors: Vec<String>) -> Self {
+    pub fn new(
+        total_crawled: i32,
+        total_episodes: i32,
+        total_video_sources: i32,
+        pages_processed: i32,
+        errors: Vec<String>,
+    ) -> Self {
         Self {
             success: true,
             data: CrawlerData {
@@ -308,6 +314,44 @@ impl CrawlerResponse {
             timestamp: Utc::now().to_rfc3339(),
         }
     }
+}
+
+// ============================================================================
+// Email Verification and Password Reset Models
+// ============================================================================
+
+/// Request body for forgot password
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ForgotPasswordRequest {
+    /// User email address
+    pub email: String,
+}
+
+/// Request body for password reset
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ResetPasswordRequest {
+    /// Password reset token
+    pub token: String,
+    /// New password
+    pub new_password: String,
+}
+
+/// Request body for email verification
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyEmailRequest {
+    /// Email verification token
+    pub token: String,
+}
+
+/// Request body for resending verification email
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ResendVerificationRequest {
+    /// User email address
+    pub email: String,
 }
 
 #[cfg(test)]

@@ -91,8 +91,8 @@ mod tests {
     #[ignore] // Requires a running database
     async fn test_database_connection() {
         dotenvy::dotenv().ok();
-        let database_url = std::env::var("DATABASE_URL")
-            .expect("DATABASE_URL must be set for tests");
+        let database_url =
+            std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for tests");
 
         let db = Database::new(&database_url).await;
         assert!(db.is_ok(), "Should connect to database");

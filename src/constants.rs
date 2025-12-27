@@ -15,7 +15,13 @@ pub mod endpoints {
     }
 
     /// Anime list URL with filters
-    pub fn anime_list(base_url: &str, page: u32, type_filter: &str, status: &str, order: &str) -> String {
+    pub fn anime_list(
+        base_url: &str,
+        page: u32,
+        type_filter: &str,
+        status: &str,
+        order: &str,
+    ) -> String {
         format!(
             "{}/anime/?page={}&status={}&type={}&order={}",
             base_url, page, status, type_filter, order
@@ -49,13 +55,7 @@ pub mod filters {
     ];
 
     /// Available anime statuses
-    pub const ANIME_STATUS: &[&str] = &[
-        "",
-        "Ongoing",
-        "Completed",
-        "Upcoming",
-        "Hiatus",
-    ];
+    pub const ANIME_STATUS: &[&str] = &["", "Ongoing", "Completed", "Upcoming", "Hiatus"];
 
     /// Available sort orders
     /// Maps to: Default, A-Z, Z-A, Latest Update, Latest Added, Popular, Rating

@@ -2,6 +2,9 @@
 //!
 //! This module contains all HTTP route handlers for the public API endpoints.
 
+pub mod auth;
+pub mod user;
+
 use actix_web::{web, HttpResponse, Responder};
 use serde::Deserialize;
 use tracing::{error, info, warn};
@@ -10,15 +13,18 @@ use utoipa::{IntoParams, OpenApi, ToSchema};
 use crate::config::Config;
 use crate::constants::endpoints;
 use crate::db::{
-    get_anime_detail, get_anime_updates, get_completed_anime,
-    is_cache_valid, save_anime_detail_with_episodes, save_anime_updates, save_completed_anime,
-    save_crawled_anime_batch, save_video_sources, update_cache_timestamp,
-    Database, DEFAULT_CACHE_TTL_MS,
+    get_anime_detail, get_anime_updates, get_completed_anime, is_cache_valid,
+    save_anime_detail_with_episodes, save_anime_updates, save_completed_anime,
+    save_crawled_anime_batch, save_video_sources, update_cache_timestamp, Database,
+    DEFAULT_CACHE_TTL_MS,
 };
+use crate::email::EmailService;
 use crate::models::{
-    AnimeListFilters, AnimeListResponse, ApiError, ApiResponse, CrawledAnime, CrawledAnimeRecord,
-    CrawlerData, CrawlerResponse, AuthResponse, AuthData, User, UserFavorite, UserHistory,
-    UserSubscription, RegisterRequest, LoginRequest, GoogleAuthRequest,
+    AnimeListFilters, AnimeListResponse, ApiError, ApiResponse, AuthData, AuthResponse,
+    CrawledAnime, CrawledAnimeRecord, CrawlerData, CrawlerResponse, ForgotPasswordRequest,
+    GoogleAuthRequest, LoginRequest, RegisterRequest, ResetPasswordRequest,
+    ResendVerificationRequest, User, UserFavorite, UserHistory, UserSubscription,
+    VerifyEmailRequest,
 };
 use crate::parser::{
     parse_anime_detail, parse_anime_list, parse_anime_updates, parse_completed_anime,
@@ -27,17 +33,21 @@ use crate::parser::{
 };
 use crate::scraper::Scraper;
 
+pub use auth::configure_auth_routes;
+pub use user::configure_user_routes;
+
 /// Application state shared across handlers
 pub struct AppState {
     pub db: Database,
     pub config: Config,
+    pub email_service: Option<EmailService>,
 }
 
 /// Cache keys for different data types
 mod cache_keys {
     pub const UPDATES: &str = "updates";
     pub const COMPLETED: &str = "completed";
-    
+
     pub fn anime_detail(slug: &str) -> String {
         format!("anime:{}", slug)
     }
@@ -57,7 +67,7 @@ mod cache_keys {
 )]
 pub async fn get_updates(data: web::Data<AppState>) -> impl Responder {
     let pool = data.db.pool();
-    
+
     match is_cache_valid(pool, cache_keys::UPDATES, DEFAULT_CACHE_TTL_MS).await {
         Ok(true) => {
             info!("Returning cached anime updates");
@@ -93,11 +103,11 @@ async fn scrape_and_return_updates(data: &web::Data<AppState>) -> HttpResponse {
     let scraper = Scraper::new();
     let url = endpoints::home(&data.config.base_url);
     info!("Fetching URL: {}", url);
-    
+
     match scraper.fetch_page(&url).await {
         Ok(result) => {
             info!("Fetched {} bytes of HTML", result.html.len());
-            
+
             let updates = parse_anime_updates(&result.html);
             info!("Parsed {} anime updates", updates.len());
 
@@ -108,7 +118,7 @@ async fn scrape_and_return_updates(data: &web::Data<AppState>) -> HttpResponse {
             if let Err(e) = update_cache_timestamp(pool, cache_keys::UPDATES).await {
                 error!("Failed to update cache timestamp: {}", e);
             }
-            
+
             HttpResponse::Ok().json(ApiResponse::new(updates))
         }
         Err(e) => {
@@ -133,7 +143,7 @@ async fn scrape_and_return_updates(data: &web::Data<AppState>) -> HttpResponse {
 )]
 pub async fn get_completed(data: web::Data<AppState>) -> impl Responder {
     let pool = data.db.pool();
-    
+
     match is_cache_valid(pool, cache_keys::COMPLETED, DEFAULT_CACHE_TTL_MS).await {
         Ok(true) => {
             info!("Returning cached completed anime");
@@ -168,7 +178,10 @@ async fn scrape_and_return_completed(data: &web::Data<AppState>) -> HttpResponse
     let pool = data.db.pool();
     let scraper = Scraper::new();
 
-    match scraper.fetch_page(&endpoints::home(&data.config.base_url)).await {
+    match scraper
+        .fetch_page(&endpoints::home(&data.config.base_url))
+        .await
+    {
         Ok(result) => {
             let completed = parse_completed_anime(&result.html);
             info!("Parsed {} completed anime", completed.len());
@@ -180,7 +193,7 @@ async fn scrape_and_return_completed(data: &web::Data<AppState>) -> HttpResponse
             if let Err(e) = update_cache_timestamp(pool, cache_keys::COMPLETED).await {
                 error!("Failed to update cache timestamp: {}", e);
             }
-            
+
             HttpResponse::Ok().json(ApiResponse::new(completed))
         }
         Err(e) => {
@@ -219,15 +232,17 @@ pub async fn search_anime(
     let keyword = match &query.q {
         Some(q) if !q.trim().is_empty() => q.trim(),
         _ => {
-            return HttpResponse::BadRequest()
-                .json(ApiError::new("Search query is required"));
+            return HttpResponse::BadRequest().json(ApiError::new("Search query is required"));
         }
     };
 
     info!("Searching for anime: {}", keyword);
     let scraper = Scraper::new();
 
-    match scraper.fetch_page(&endpoints::search(&data.config.base_url, keyword)).await {
+    match scraper
+        .fetch_page(&endpoints::search(&data.config.base_url, keyword))
+        .await
+    {
         Ok(result) => {
             let results = parse_search_results(&result.html);
             HttpResponse::Ok().json(ApiResponse::new(results))
@@ -287,11 +302,11 @@ pub async fn get_anime_list(
 
     let scraper = Scraper::new();
     let url = endpoints::anime_list(&data.config.base_url, page, anime_type, status, order);
-    
+
     match scraper.fetch_page(&url).await {
         Ok(result) => {
             let items = parse_anime_list(&result.html);
-            
+
             let response = AnimeListResponse {
                 items,
                 page: page as i32,
@@ -301,7 +316,7 @@ pub async fn get_anime_list(
                     order: order.to_string(),
                 },
             };
-            
+
             HttpResponse::Ok().json(ApiResponse::new(response))
         }
         Err(e) => {
@@ -335,15 +350,13 @@ pub async fn get_anime_by_slug(
     let slug = path.into_inner();
     let pool = data.db.pool();
     let cache_key = cache_keys::anime_detail(&slug);
-    
+
     match is_cache_valid(pool, &cache_key, DEFAULT_CACHE_TTL_MS).await {
         Ok(true) => {
             info!("Returning cached anime detail for: {}", slug);
             match get_anime_detail(pool, &slug).await {
                 Ok(Some(detail)) => HttpResponse::Ok().json(ApiResponse::new(detail)),
-                Ok(None) => {
-                    scrape_and_save_anime_detail(&data, &slug).await
-                }
+                Ok(None) => scrape_and_save_anime_detail(&data, &slug).await,
                 Err(e) => {
                     error!("Failed to get cached anime detail: {}", e);
                     HttpResponse::InternalServerError()
@@ -351,9 +364,7 @@ pub async fn get_anime_by_slug(
                 }
             }
         }
-        Ok(false) => {
-            scrape_and_save_anime_detail(&data, &slug).await
-        }
+        Ok(false) => scrape_and_save_anime_detail(&data, &slug).await,
         Err(e) => {
             error!("Failed to check cache validity: {}", e);
             scrape_anime_detail_only(&data, &slug).await
@@ -368,13 +379,15 @@ async fn scrape_and_save_anime_detail(data: &web::Data<AppState>, slug: &str) ->
     let pool = data.db.pool();
     let cache_key = cache_keys::anime_detail(slug);
 
-    match scraper.fetch_page(&endpoints::anime(&data.config.base_url, slug)).await {
+    match scraper
+        .fetch_page(&endpoints::anime(&data.config.base_url, slug))
+        .await
+    {
         Ok(result) => {
             let detail = parse_anime_detail(&result.html);
 
             if detail.title.is_empty() {
-                return HttpResponse::NotFound()
-                    .json(ApiError::new("Anime not found"));
+                return HttpResponse::NotFound().json(ApiError::new("Anime not found"));
             }
 
             if let Err(e) = save_anime_detail_with_episodes(pool, slug, &detail).await {
@@ -384,7 +397,7 @@ async fn scrape_and_save_anime_detail(data: &web::Data<AppState>, slug: &str) ->
             if let Err(e) = update_cache_timestamp(pool, &cache_key).await {
                 error!("Failed to update cache timestamp: {}", e);
             }
-            
+
             HttpResponse::Ok().json(ApiResponse::new(detail))
         }
         Err(e) => {
@@ -399,15 +412,17 @@ async fn scrape_and_save_anime_detail(data: &web::Data<AppState>, slug: &str) ->
 async fn scrape_anime_detail_only(data: &web::Data<AppState>, slug: &str) -> HttpResponse {
     let scraper = Scraper::new();
 
-    match scraper.fetch_page(&endpoints::anime(&data.config.base_url, slug)).await {
+    match scraper
+        .fetch_page(&endpoints::anime(&data.config.base_url, slug))
+        .await
+    {
         Ok(result) => {
             let detail = parse_anime_detail(&result.html);
-            
+
             if detail.title.is_empty() {
-                return HttpResponse::NotFound()
-                    .json(ApiError::new("Anime not found"));
+                return HttpResponse::NotFound().json(ApiError::new("Anime not found"));
             }
-            
+
             HttpResponse::Ok().json(ApiResponse::new(detail))
         }
         Err(e) => {
@@ -440,18 +455,17 @@ pub async fn get_episode_by_slug(
 ) -> impl Responder {
     let slug = path.into_inner();
     let pool = data.db.pool();
-    
+
     info!("Fetching episode: {}", slug);
     let scraper = Scraper::new();
     let url = endpoints::episode(&data.config.base_url, &slug);
-    
+
     match scraper.fetch_page(&url).await {
         Ok(result) => {
             let episode_detail = parse_episode_detail(&result.html);
 
             if episode_detail.title.is_empty() && episode_detail.sources.is_empty() {
-                return HttpResponse::NotFound()
-                    .json(ApiError::new("Episode not found"));
+                return HttpResponse::NotFound().json(ApiError::new("Episode not found"));
             }
 
             if !episode_detail.sources.is_empty() {
@@ -459,7 +473,7 @@ pub async fn get_episode_by_slug(
                     error!("Failed to save video sources: {}", e);
                 }
             }
-            
+
             HttpResponse::Ok().json(ApiResponse::new(episode_detail))
         }
         Err(e) => {
@@ -496,15 +510,15 @@ pub async fn run_crawler(data: web::Data<AppState>) -> impl Responder {
     info!("Starting bulk crawler");
     let pool = data.db.pool();
     let scraper = Scraper::new();
-    
+
     let mut total_crawled: i32 = 0;
     let mut total_episodes: i32 = 0;
     let mut total_video_sources: i32 = 0;
     let mut pages_processed: i32 = 0;
     let mut errors: Vec<String> = Vec::new();
-    
+
     let mut page: u32 = 1;
-    
+
     loop {
         info!("Crawling page {}", page);
         let url = endpoints::anime_list(&data.config.base_url, page, "", "", "");
@@ -529,7 +543,7 @@ pub async fn run_crawler(data: web::Data<AppState>) -> impl Responder {
                 continue;
             }
         };
-        
+
         pages_processed += 1;
 
         let crawled_anime: Vec<CrawledAnime> = anime_list
@@ -556,7 +570,10 @@ pub async fn run_crawler(data: web::Data<AppState>) -> impl Responder {
         for anime in &crawled_anime {
             let slug = &anime.slug;
 
-            let detail = match scraper.fetch_page(&endpoints::anime(&data.config.base_url, slug)).await {
+            let detail = match scraper
+                .fetch_page(&endpoints::anime(&data.config.base_url, slug))
+                .await
+            {
                 Ok(result) => {
                     let detail = parse_anime_detail(&result.html);
                     if detail.title.is_empty() {
@@ -584,14 +601,20 @@ pub async fn run_crawler(data: web::Data<AppState>) -> impl Responder {
             for episode in &detail.episodes {
                 let episode_slug = extract_slug_from_url(&episode.url);
                 let episode_url = endpoints::episode(&data.config.base_url, &episode_slug);
-                
+
                 match scraper.fetch_page(&episode_url).await {
                     Ok(result) => {
                         let episode_detail = parse_episode_detail(&result.html);
-                        
+
                         if !episode_detail.sources.is_empty() {
-                            if let Err(e) = save_video_sources(pool, &episode.url, &episode_detail.sources).await {
-                                let error_msg = format!("Failed to save video sources for {}: {}", episode_slug, e);
+                            if let Err(e) =
+                                save_video_sources(pool, &episode.url, &episode_detail.sources)
+                                    .await
+                            {
+                                let error_msg = format!(
+                                    "Failed to save video sources for {}: {}",
+                                    episode_slug, e
+                                );
                                 warn!("{}", error_msg);
                                 errors.push(error_msg);
                             } else {
@@ -608,7 +631,7 @@ pub async fn run_crawler(data: web::Data<AppState>) -> impl Responder {
                 }
             }
         }
-        
+
         page += 1;
 
         if page > 1000 {
@@ -616,12 +639,12 @@ pub async fn run_crawler(data: web::Data<AppState>) -> impl Responder {
             break;
         }
     }
-    
+
     info!(
         "Crawler completed: {} anime, {} episodes, {} video sources, {} pages",
         total_crawled, total_episodes, total_video_sources, pages_processed
     );
-    
+
     HttpResponse::Ok().json(CrawlerResponse::new(
         total_crawled,
         total_episodes,
@@ -653,7 +676,25 @@ pub async fn run_crawler(data: web::Data<AppState>) -> impl Responder {
         get_anime_list,
         get_anime_by_slug,
         get_episode_by_slug,
-        run_crawler
+        run_crawler,
+        auth::register,
+        auth::login,
+        auth::google_auth,
+        auth::logout,
+        auth::get_me,
+        auth::forgot_password,
+        auth::reset_password,
+        auth::verify_email,
+        auth::resend_verification,
+        user::add_favorite_handler,
+        user::get_favorites_handler,
+        user::remove_favorite_handler,
+        user::add_subscription_handler,
+        user::get_subscriptions_handler,
+        user::remove_subscription_handler,
+        user::add_history_handler,
+        user::get_history_handler,
+        user::remove_history_handler
     ),
     components(
         schemas(
@@ -682,11 +723,20 @@ pub async fn run_crawler(data: web::Data<AppState>) -> impl Responder {
             CrawlerResponse,
             CrawlerData,
             SearchQuery,
-            AnimeListQuery
+            AnimeListQuery,
+            user::AddFavoriteRequest,
+            user::AddSubscriptionRequest,
+            user::AddHistoryRequest,
+            ForgotPasswordRequest,
+            ResetPasswordRequest,
+            VerifyEmailRequest,
+            ResendVerificationRequest
         )
     ),
     tags(
         (name = "anime", description = "Anime data endpoints"),
+        (name = "auth", description = "Authentication endpoints"),
+        (name = "user", description = "User-specific endpoints (favorites, subscriptions, history)"),
         (name = "crawler", description = "Bulk crawling operations")
     )
 )]
@@ -702,6 +752,6 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .route("/anime/list", web::get().to(get_anime_list))
             .route("/anime/{slug}", web::get().to(get_anime_by_slug))
             .route("/episode/{slug}", web::get().to(get_episode_by_slug))
-            .route("/crawler/run", web::post().to(run_crawler))
+            .route("/crawler/run", web::post().to(run_crawler)),
     );
 }

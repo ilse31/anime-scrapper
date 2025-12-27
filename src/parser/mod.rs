@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 /// Extract slug from a URL
-/// 
+///
 /// Takes a URL like "https://x3.sokuja.uk/anime/one-piece-subtitle-indonesia/"
 /// and returns "one-piece-subtitle-indonesia"
 fn extract_slug_from_url(url: &str) -> String {
@@ -215,10 +215,10 @@ pub struct CompletedAnime {
 /// A vector of `AnimeUpdate` structs
 pub fn parse_anime_updates(html: &str) -> Vec<AnimeUpdate> {
     let document = Html::parse_document(html);
-    
+
     // Selector for article.seventh elements
     let article_selector = Selector::parse("article.seventh").unwrap();
-    
+
     // Selectors for individual fields
     let title_selector = Selector::parse("h2[itemprop=\"headline\"] a").unwrap();
     let url_selector = Selector::parse("a[itemprop=\"url\"]").unwrap();
@@ -228,42 +228,46 @@ pub fn parse_anime_updates(html: &str) -> Vec<AnimeUpdate> {
     let series_selector = Selector::parse("div.sosev span a").unwrap();
     let release_info_selector = Selector::parse("div.sosev span").unwrap();
     let status_selector = Selector::parse("span.status").unwrap();
-    
+
     let mut updates = Vec::new();
-    
+
     for article in document.select(&article_selector) {
         let title = article
             .select(&title_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let episode_url = article
             .select(&url_selector)
             .next()
             .and_then(|el| el.value().attr("href"))
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         let thumbnail = article
             .select(&thumbnail_selector)
             .next()
-            .and_then(|el| el.value().attr("src").or_else(|| el.value().attr("data-src")))
+            .and_then(|el| {
+                el.value()
+                    .attr("src")
+                    .or_else(|| el.value().attr("data-src"))
+            })
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         let episode_number = article
             .select(&episode_number_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let anime_type = article
             .select(&type_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let (series_title, series_url) = article
             .select(&series_selector)
             .next()
@@ -273,7 +277,7 @@ pub fn parse_anime_updates(html: &str) -> Vec<AnimeUpdate> {
                 (text, href)
             })
             .unwrap_or_default();
-        
+
         // Extract release info from div.sosev span (the one containing date/time)
         let release_info = article
             .select(&release_info_selector)
@@ -288,13 +292,13 @@ pub fn parse_anime_updates(html: &str) -> Vec<AnimeUpdate> {
             })
             .next()
             .unwrap_or_default();
-        
+
         let status = article
             .select(&status_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         updates.push(AnimeUpdate {
             slug: extract_slug_from_url(&series_url),
             title,
@@ -308,7 +312,7 @@ pub fn parse_anime_updates(html: &str) -> Vec<AnimeUpdate> {
             release_info,
         });
     }
-    
+
     updates
 }
 
@@ -323,10 +327,10 @@ pub fn parse_anime_updates(html: &str) -> Vec<AnimeUpdate> {
 /// A vector of `CompletedAnime` structs
 pub fn parse_completed_anime(html: &str) -> Vec<CompletedAnime> {
     let document = Html::parse_document(html);
-    
+
     // Selector for article.stylesix elements
     let article_selector = Selector::parse("article.stylesix").unwrap();
-    
+
     // Selectors for individual fields
     let title_selector = Selector::parse("h2[itemprop=\"headline\"] a").unwrap();
     let url_selector = Selector::parse("a[itemprop=\"url\"]").unwrap();
@@ -337,66 +341,70 @@ pub fn parse_completed_anime(html: &str) -> Vec<CompletedAnime> {
     let genre_selector = Selector::parse("a[rel=\"tag\"]").unwrap();
     let li_selector = Selector::parse("li").unwrap();
     let series_link_selector = Selector::parse("a").unwrap();
-    
+
     let mut completed = Vec::new();
-    
+
     for article in document.select(&article_selector) {
         let title = article
             .select(&title_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let url = article
             .select(&url_selector)
             .next()
             .and_then(|el| el.value().attr("href"))
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         let thumbnail = article
             .select(&thumbnail_selector)
             .next()
-            .and_then(|el| el.value().attr("src").or_else(|| el.value().attr("data-src")))
+            .and_then(|el| {
+                el.value()
+                    .attr("src")
+                    .or_else(|| el.value().attr("data-src"))
+            })
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         let anime_type = article
             .select(&type_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let episode_count = article
             .select(&episode_count_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let rating = article
             .select(&rating_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         // Extract genres from genre links
         let genres: Vec<String> = article
             .select(&genre_selector)
             .map(|el| el.text().collect::<String>().trim().to_string())
             .filter(|s| !s.is_empty())
             .collect();
-        
+
         // Extract status, posted_by, posted_at from list items
         let mut status = String::new();
         let mut posted_by = String::new();
         let mut posted_at = String::new();
         let mut series_title = String::new();
         let mut series_url = String::new();
-        
+
         for li in article.select(&li_selector) {
             let text = li.text().collect::<String>();
             let text_lower = text.to_lowercase();
-            
+
             if text_lower.contains("status:") || text_lower.contains("status :") {
                 status = text
                     .split(':')
@@ -409,7 +417,10 @@ pub fn parse_completed_anime(html: &str) -> Vec<CompletedAnime> {
                     .nth(1)
                     .map(|s| s.trim().to_string())
                     .unwrap_or_default();
-            } else if text_lower.contains("dipos pada:") || text_lower.contains("posted at:") || text_lower.contains("posted on:") {
+            } else if text_lower.contains("dipos pada:")
+                || text_lower.contains("posted at:")
+                || text_lower.contains("posted on:")
+            {
                 posted_at = text
                     .split(':')
                     .skip(1)
@@ -418,7 +429,7 @@ pub fn parse_completed_anime(html: &str) -> Vec<CompletedAnime> {
                     .trim()
                     .to_string();
             }
-            
+
             // Check for series link in list items
             if let Some(link) = li.select(&series_link_selector).next() {
                 let href = link.value().attr("href").unwrap_or_default();
@@ -428,7 +439,7 @@ pub fn parse_completed_anime(html: &str) -> Vec<CompletedAnime> {
                 }
             }
         }
-        
+
         completed.push(CompletedAnime {
             slug: extract_slug_from_url(&url),
             title,
@@ -445,7 +456,7 @@ pub fn parse_completed_anime(html: &str) -> Vec<CompletedAnime> {
             rating,
         });
     }
-    
+
     completed
 }
 
@@ -460,11 +471,11 @@ pub fn parse_completed_anime(html: &str) -> Vec<CompletedAnime> {
 /// A vector of `SearchResult` structs. Returns empty array if no results found.
 pub fn parse_search_results(html: &str) -> Vec<SearchResult> {
     let document = Html::parse_document(html);
-    
+
     // First try to find div.listupd container, then look for article.bs inside
     let listupd_selector = Selector::parse("div.listupd").unwrap();
     let article_selector = Selector::parse("article.bs").unwrap();
-    
+
     // Selectors for individual fields
     let title_selector = Selector::parse("h2[itemprop=\"headline\"]").unwrap();
     let url_selector = Selector::parse("a[itemprop=\"url\"]").unwrap();
@@ -472,9 +483,9 @@ pub fn parse_search_results(html: &str) -> Vec<SearchResult> {
     let status_selector = Selector::parse("div.status").unwrap();
     let type_selector = Selector::parse("div.typez").unwrap();
     let episode_status_selector = Selector::parse("span.epx").unwrap();
-    
+
     let mut results = Vec::new();
-    
+
     // Try to find articles inside div.listupd first
     let articles: Vec<_> = if let Some(listupd) = document.select(&listupd_selector).next() {
         listupd.select(&article_selector).collect()
@@ -482,46 +493,50 @@ pub fn parse_search_results(html: &str) -> Vec<SearchResult> {
         // Fallback: look for article.bs anywhere in the document
         document.select(&article_selector).collect()
     };
-    
+
     for article in articles {
         let title = article
             .select(&title_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let url = article
             .select(&url_selector)
             .next()
             .and_then(|el| el.value().attr("href"))
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         let thumbnail = article
             .select(&thumbnail_selector)
             .next()
-            .and_then(|el| el.value().attr("src").or_else(|| el.value().attr("data-src")))
+            .and_then(|el| {
+                el.value()
+                    .attr("src")
+                    .or_else(|| el.value().attr("data-src"))
+            })
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         let status = article
             .select(&status_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let anime_type = article
             .select(&type_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let episode_status = article
             .select(&episode_status_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         results.push(SearchResult {
             slug: extract_slug_from_url(&url),
             title,
@@ -532,7 +547,7 @@ pub fn parse_search_results(html: &str) -> Vec<SearchResult> {
             episode_status,
         });
     }
-    
+
     results
 }
 
@@ -548,11 +563,11 @@ pub fn parse_search_results(html: &str) -> Vec<SearchResult> {
 /// A vector of `AnimeListItem` structs. Returns empty array if no results found.
 pub fn parse_anime_list(html: &str) -> Vec<AnimeListItem> {
     let document = Html::parse_document(html);
-    
+
     // First try to find div.listupd container, then look for article.bs inside
     let listupd_selector = Selector::parse("div.listupd").unwrap();
     let article_selector = Selector::parse("article.bs").unwrap();
-    
+
     // Selectors for individual fields
     let title_selector = Selector::parse("h2[itemprop=\"headline\"]").unwrap();
     let url_selector = Selector::parse("a[itemprop=\"url\"]").unwrap();
@@ -560,9 +575,9 @@ pub fn parse_anime_list(html: &str) -> Vec<AnimeListItem> {
     let status_selector = Selector::parse("div.status").unwrap();
     let type_selector = Selector::parse("div.typez").unwrap();
     let episode_status_selector = Selector::parse("span.epx").unwrap();
-    
+
     let mut results = Vec::new();
-    
+
     // Try to find articles inside div.listupd first
     let articles: Vec<_> = if let Some(listupd) = document.select(&listupd_selector).next() {
         listupd.select(&article_selector).collect()
@@ -570,46 +585,50 @@ pub fn parse_anime_list(html: &str) -> Vec<AnimeListItem> {
         // Fallback: look for article.bs anywhere in the document
         document.select(&article_selector).collect()
     };
-    
+
     for article in articles {
         let title = article
             .select(&title_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let url = article
             .select(&url_selector)
             .next()
             .and_then(|el| el.value().attr("href"))
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         let thumbnail = article
             .select(&thumbnail_selector)
             .next()
-            .and_then(|el| el.value().attr("src").or_else(|| el.value().attr("data-src")))
+            .and_then(|el| {
+                el.value()
+                    .attr("src")
+                    .or_else(|| el.value().attr("data-src"))
+            })
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         let status = article
             .select(&status_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let anime_type = article
             .select(&type_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let episode_status = article
             .select(&episode_status_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         results.push(AnimeListItem {
             slug: extract_slug_from_url(&url),
             title,
@@ -620,7 +639,7 @@ pub fn parse_anime_list(html: &str) -> Vec<AnimeListItem> {
             episode_status,
         });
     }
-    
+
     results
 }
 
@@ -635,7 +654,7 @@ pub fn parse_anime_list(html: &str) -> Vec<AnimeListItem> {
 /// An `AnimeDetail` struct with all extracted information
 pub fn parse_anime_detail(html: &str) -> AnimeDetail {
     let document = Html::parse_document(html);
-    
+
     // Selectors for metadata
     let title_selector = Selector::parse("h1.entry-title").unwrap();
     let alternate_titles_selector = Selector::parse("span.alter").unwrap();
@@ -646,36 +665,40 @@ pub fn parse_anime_detail(html: &str) -> AnimeDetail {
     let casts_selector = Selector::parse("a.casts").unwrap();
     let genres_selector = Selector::parse("div.genxed a").unwrap();
     let synopsis_selector = Selector::parse("div.desc").unwrap();
-    
+
     // Episode list selectors
     let episode_list_selector = Selector::parse("div.eplister ul li").unwrap();
     let episode_num_selector = Selector::parse("div.epl-num").unwrap();
     let episode_title_selector = Selector::parse("div.epl-title").unwrap();
     let episode_url_selector = Selector::parse("a").unwrap();
     let episode_date_selector = Selector::parse("div.epl-date").unwrap();
-    
+
     // Extract title
     let title = document
         .select(&title_selector)
         .next()
         .map(|el| el.text().collect::<String>().trim().to_string())
         .unwrap_or_default();
-    
+
     // Extract alternate titles
     let alternate_titles = document
         .select(&alternate_titles_selector)
         .next()
         .map(|el| el.text().collect::<String>().trim().to_string())
         .unwrap_or_default();
-    
+
     // Extract poster image
     let poster = document
         .select(&poster_selector)
         .next()
-        .and_then(|el| el.value().attr("src").or_else(|| el.value().attr("data-src")))
+        .and_then(|el| {
+            el.value()
+                .attr("src")
+                .or_else(|| el.value().attr("data-src"))
+        })
         .map(|s| s.to_string())
         .unwrap_or_default();
-    
+
     // Extract rating from meta tag
     let rating = document
         .select(&rating_selector)
@@ -683,7 +706,7 @@ pub fn parse_anime_detail(html: &str) -> AnimeDetail {
         .and_then(|el| el.value().attr("content"))
         .map(|s| s.to_string())
         .unwrap_or_default();
-    
+
     // Extract trailer URL
     let trailer_url = document
         .select(&trailer_selector)
@@ -691,7 +714,7 @@ pub fn parse_anime_detail(html: &str) -> AnimeDetail {
         .and_then(|el| el.value().attr("href"))
         .map(|s| s.to_string())
         .unwrap_or_default();
-    
+
     // Extract metadata from div.spe span elements
     let mut status = String::new();
     let mut studio = String::new();
@@ -701,11 +724,11 @@ pub fn parse_anime_detail(html: &str) -> AnimeDetail {
     let mut anime_type = String::new();
     let mut total_episodes = String::new();
     let mut director = String::new();
-    
+
     for span in document.select(&spe_span_selector) {
         let text = span.text().collect::<String>();
         let text_lower = text.to_lowercase();
-        
+
         // Extract value after colon
         let extract_value = |text: &str| -> String {
             text.split(':')
@@ -715,12 +738,15 @@ pub fn parse_anime_detail(html: &str) -> AnimeDetail {
                 .trim()
                 .to_string()
         };
-        
+
         if text_lower.contains("status") {
             status = extract_value(&text);
         } else if text_lower.contains("studio") {
             studio = extract_value(&text);
-        } else if text_lower.contains("tanggal rilis") || text_lower.contains("release") || text_lower.contains("released") {
+        } else if text_lower.contains("tanggal rilis")
+            || text_lower.contains("release")
+            || text_lower.contains("released")
+        {
             release_date = extract_value(&text);
         } else if text_lower.contains("durasi") || text_lower.contains("duration") {
             duration = extract_value(&text);
@@ -734,63 +760,60 @@ pub fn parse_anime_detail(html: &str) -> AnimeDetail {
             director = extract_value(&text);
         }
     }
-    
+
     // Extract casts
     let casts: Vec<String> = document
         .select(&casts_selector)
         .map(|el| el.text().collect::<String>().trim().to_string())
         .filter(|s| !s.is_empty())
         .collect();
-    
+
     // Extract genres
     let genres: Vec<String> = document
         .select(&genres_selector)
         .map(|el| el.text().collect::<String>().trim().to_string())
         .filter(|s| !s.is_empty())
         .collect();
-    
+
     // Extract synopsis
     let synopsis = document
         .select(&synopsis_selector)
         .next()
         .map(|el| {
             // Get all text content, preserving some structure
-            el.text()
-                .collect::<String>()
-                .trim()
-                .to_string()
+            el.text().collect::<String>().trim().to_string()
         })
         .unwrap_or_default();
-    
+
     // Extract episodes from div.eplister
     let mut episodes: Vec<Episode> = Vec::new();
-    
+
     for li in document.select(&episode_list_selector) {
         let number = li
             .select(&episode_num_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let ep_title = li
             .select(&episode_title_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let url = li
             .select(&episode_url_selector)
             .next()
             .and_then(|el| el.value().attr("href"))
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         let ep_release_date = li
             .select(&episode_date_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         episodes.push(Episode {
             slug: extract_slug_from_url(&url),
             number,
@@ -799,7 +822,7 @@ pub fn parse_anime_detail(html: &str) -> AnimeDetail {
             release_date: ep_release_date,
         });
     }
-    
+
     AnimeDetail {
         title,
         alternate_titles,
@@ -833,42 +856,42 @@ pub fn parse_anime_detail(html: &str) -> AnimeDetail {
 /// A vector of `Episode` structs in the order they appear in the HTML
 pub fn parse_episode_list(html: &str) -> Vec<Episode> {
     let document = Html::parse_document(html);
-    
+
     // Selectors for episode list
     let episode_list_selector = Selector::parse("div.eplister ul li").unwrap();
     let episode_num_selector = Selector::parse("div.epl-num").unwrap();
     let episode_title_selector = Selector::parse("div.epl-title").unwrap();
     let episode_url_selector = Selector::parse("a").unwrap();
     let episode_date_selector = Selector::parse("div.epl-date").unwrap();
-    
+
     let mut episodes: Vec<Episode> = Vec::new();
-    
+
     for li in document.select(&episode_list_selector) {
         let number = li
             .select(&episode_num_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let title = li
             .select(&episode_title_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         let url = li
             .select(&episode_url_selector)
             .next()
             .and_then(|el| el.value().attr("href"))
             .map(|s| s.to_string())
             .unwrap_or_default();
-        
+
         let release_date = li
             .select(&episode_date_selector)
             .next()
             .map(|el| el.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
-        
+
         episodes.push(Episode {
             slug: extract_slug_from_url(&url),
             number,
@@ -877,7 +900,7 @@ pub fn parse_episode_list(html: &str) -> Vec<Episode> {
             release_date,
         });
     }
-    
+
     episodes
 }
 
@@ -894,19 +917,19 @@ pub fn parse_episode_list(html: &str) -> Vec<Episode> {
 /// An `EpisodeDetail` struct with title, default video, and all video sources
 pub fn parse_episode_detail(html: &str) -> EpisodeDetail {
     let document = Html::parse_document(html);
-    
+
     // Selectors
     let title_selector = Selector::parse("h1.entry-title").unwrap();
     let default_video_selector = Selector::parse("div#embed_holder video source").unwrap();
     let mirror_option_selector = Selector::parse("select.mirror option").unwrap();
-    
+
     // Extract episode title
     let title = document
         .select(&title_selector)
         .next()
         .map(|el| el.text().collect::<String>().trim().to_string())
         .unwrap_or_default();
-    
+
     // Extract default video URL from div#embed_holder video source
     let default_video = document
         .select(&default_video_selector)
@@ -914,33 +937,33 @@ pub fn parse_episode_detail(html: &str) -> EpisodeDetail {
         .and_then(|el| el.value().attr("src"))
         .map(|s| s.to_string())
         .unwrap_or_default();
-    
+
     // Extract video sources from select.mirror option elements
     let mut sources: Vec<VideoSource> = Vec::new();
-    
+
     for option in document.select(&mirror_option_selector) {
         // Get the base64-encoded value
         let value = match option.value().attr("value") {
             Some(v) if !v.is_empty() => v,
             _ => continue,
         };
-        
+
         // Get the option text for server and quality info
         let option_text = option.text().collect::<String>().trim().to_string();
-        
+
         // Parse server and quality from option text
         // Format is typically "SERVER - QUALITY" or "SERVER QUALITY" or just "SERVER"
         let (server, quality) = parse_server_quality(&option_text);
-        
+
         // Decode base64 value
         let decoded_html = match decode_base64_value(value) {
             Some(html) => html,
             None => continue, // Skip invalid base64
         };
-        
+
         // Extract video URL from decoded HTML
         let video_url = extract_video_url_from_html(&decoded_html);
-        
+
         if !video_url.is_empty() {
             sources.push(VideoSource {
                 server,
@@ -949,7 +972,7 @@ pub fn parse_episode_detail(html: &str) -> EpisodeDetail {
             });
         }
     }
-    
+
     EpisodeDetail {
         title,
         default_video,
@@ -966,14 +989,14 @@ pub fn parse_episode_detail(html: &str) -> EpisodeDetail {
 /// - "Server Name - 1080p HD"
 fn parse_server_quality(text: &str) -> (String, String) {
     let text = text.trim();
-    
+
     // Try to split by " - " first
     if let Some(idx) = text.find(" - ") {
         let server = text[..idx].trim().to_string();
         let quality = text[idx + 3..].trim().to_string();
         return (server, quality);
     }
-    
+
     // Try to find quality pattern (e.g., "480p", "720p", "1080p")
     let quality_patterns = ["1080p", "720p", "480p", "360p", "240p"];
     for pattern in quality_patterns {
@@ -986,7 +1009,7 @@ fn parse_server_quality(text: &str) -> (String, String) {
             return (text.to_string(), quality);
         }
     }
-    
+
     // No quality found, entire text is server name
     (text.to_string(), String::new())
 }
@@ -997,7 +1020,7 @@ fn parse_server_quality(text: &str) -> (String, String) {
 fn decode_base64_value(value: &str) -> Option<String> {
     // Try to decode the base64 value
     let decoded_bytes = STANDARD.decode(value).ok()?;
-    
+
     // Convert to UTF-8 string
     String::from_utf8(decoded_bytes).ok()
 }
@@ -1007,7 +1030,7 @@ fn decode_base64_value(value: &str) -> Option<String> {
 /// Looks for video source elements or iframe src attributes
 fn extract_video_url_from_html(html: &str) -> String {
     let document = Html::parse_fragment(html);
-    
+
     // Try to find video source element
     if let Ok(source_selector) = Selector::parse("source") {
         if let Some(source) = document.select(&source_selector).next() {
@@ -1016,7 +1039,7 @@ fn extract_video_url_from_html(html: &str) -> String {
             }
         }
     }
-    
+
     // Try to find video element with src
     if let Ok(video_selector) = Selector::parse("video") {
         if let Some(video) = document.select(&video_selector).next() {
@@ -1025,7 +1048,7 @@ fn extract_video_url_from_html(html: &str) -> String {
             }
         }
     }
-    
+
     // Try to find iframe src
     if let Ok(iframe_selector) = Selector::parse("iframe") {
         if let Some(iframe) = document.select(&iframe_selector).next() {
@@ -1034,7 +1057,7 @@ fn extract_video_url_from_html(html: &str) -> String {
             }
         }
     }
-    
+
     // Try to find embed src
     if let Ok(embed_selector) = Selector::parse("embed") {
         if let Some(embed) = document.select(&embed_selector).next() {
@@ -1043,7 +1066,7 @@ fn extract_video_url_from_html(html: &str) -> String {
             }
         }
     }
-    
+
     String::new()
 }
 
@@ -1078,10 +1101,10 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let updates = parse_anime_updates(html);
         assert_eq!(updates.len(), 1);
-        
+
         let update = &updates[0];
         assert_eq!(update.title, "Test Anime Episode 1");
         assert_eq!(update.episode_url, "/episode-1/");
@@ -1104,10 +1127,10 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let updates = parse_anime_updates(html);
         assert_eq!(updates.len(), 1);
-        
+
         let update = &updates[0];
         assert_eq!(update.title, "Test Anime");
         // Missing elements should default to empty strings
@@ -1147,10 +1170,10 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let completed = parse_completed_anime(html);
         assert_eq!(completed.len(), 1);
-        
+
         let anime = &completed[0];
         assert_eq!(anime.title, "Test Anime Complete");
         assert_eq!(anime.url, "/anime/test-anime/");
@@ -1175,10 +1198,10 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let completed = parse_completed_anime(html);
         assert_eq!(completed.len(), 1);
-        
+
         let anime = &completed[0];
         assert_eq!(anime.title, "Test");
         // Missing elements should default to empty strings/arrays
@@ -1202,7 +1225,7 @@ mod tests {
             status: "Ongoing".to_string(),
             release_info: "2 hours ago".to_string(),
         };
-        
+
         let json = serde_json::to_string(&update).unwrap();
         // Verify camelCase serialization
         assert!(json.contains("\"episodeUrl\""));
@@ -1228,7 +1251,7 @@ mod tests {
             genres: vec!["Action".to_string()],
             rating: "8.5".to_string(),
         };
-        
+
         let json = serde_json::to_string(&anime).unwrap();
         // Verify camelCase serialization
         assert!(json.contains("\"episodeCount\""));
@@ -1259,7 +1282,7 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let results = parse_search_results(html);
         // Should still find article.bs even without div.listupd (fallback behavior)
         assert_eq!(results.len(), 1);
@@ -1283,10 +1306,10 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let results = parse_search_results(html);
         assert_eq!(results.len(), 1);
-        
+
         let result = &results[0];
         assert_eq!(result.title, "Naruto Shippuden");
         assert_eq!(result.url, "/anime/naruto-shippuden/");
@@ -1322,13 +1345,13 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let results = parse_search_results(html);
         assert_eq!(results.len(), 2);
-        
+
         assert_eq!(results[0].title, "Anime One");
         assert_eq!(results[0].anime_type, "TV");
-        
+
         assert_eq!(results[1].title, "Anime Two");
         assert_eq!(results[1].anime_type, "Movie");
     }
@@ -1346,10 +1369,10 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let results = parse_search_results(html);
         assert_eq!(results.len(), 1);
-        
+
         let result = &results[0];
         assert_eq!(result.title, "Minimal Anime");
         // Missing elements should default to empty strings
@@ -1379,7 +1402,7 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let results = parse_search_results(html);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].thumbnail, "https://example.com/lazy.jpg");
@@ -1396,7 +1419,7 @@ mod tests {
             anime_type: "TV".to_string(),
             episode_status: "12 Episodes".to_string(),
         };
-        
+
         let json = serde_json::to_string(&result).unwrap();
         // Verify camelCase serialization
         assert!(json.contains("\"title\""));
@@ -1434,10 +1457,10 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let results = parse_anime_list(html);
         assert_eq!(results.len(), 1);
-        
+
         let item = &results[0];
         assert_eq!(item.title, "One Piece");
         assert_eq!(item.url, "/anime/one-piece/");
@@ -1481,16 +1504,16 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let results = parse_anime_list(html);
         assert_eq!(results.len(), 3);
-        
+
         assert_eq!(results[0].title, "Anime A");
         assert_eq!(results[0].anime_type, "Movie");
-        
+
         assert_eq!(results[1].title, "Anime B");
         assert_eq!(results[1].anime_type, "ONA");
-        
+
         assert_eq!(results[2].title, "Anime C");
         assert_eq!(results[2].status, "Upcoming");
     }
@@ -1508,10 +1531,10 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let results = parse_anime_list(html);
         assert_eq!(results.len(), 1);
-        
+
         let item = &results[0];
         assert_eq!(item.title, "Minimal Anime");
         // Missing elements should default to empty strings
@@ -1541,7 +1564,7 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let results = parse_anime_list(html);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].thumbnail, "https://example.com/lazy.jpg");
@@ -1566,7 +1589,7 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let results = parse_anime_list(html);
         // Should still find article.bs even without div.listupd (fallback behavior)
         assert_eq!(results.len(), 1);
@@ -1584,7 +1607,7 @@ mod tests {
             anime_type: "TV".to_string(),
             episode_status: "12 Episodes".to_string(),
         };
-        
+
         let json = serde_json::to_string(&item).unwrap();
         // Verify camelCase serialization
         assert!(json.contains("\"title\""));
@@ -1601,7 +1624,7 @@ mod tests {
     fn test_parse_anime_detail_empty_html() {
         let html = "<html><body></body></html>";
         let detail = parse_anime_detail(html);
-        
+
         // All fields should be empty strings or empty arrays
         assert_eq!(detail.title, "");
         assert_eq!(detail.alternate_titles, "");
@@ -1676,11 +1699,14 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let detail = parse_anime_detail(html);
-        
+
         assert_eq!(detail.title, "Naruto Shippuden");
-        assert_eq!(detail.alternate_titles, "Naruto: Hurricane Chronicles, ナルト 疾風伝");
+        assert_eq!(
+            detail.alternate_titles,
+            "Naruto: Hurricane Chronicles, ナルト 疾風伝"
+        );
         assert_eq!(detail.poster, "https://example.com/naruto-poster.jpg");
         assert_eq!(detail.rating, "8.7");
         assert_eq!(detail.trailer_url, "https://youtube.com/watch?v=abc123");
@@ -1692,19 +1718,25 @@ mod tests {
         assert_eq!(detail.anime_type, "TV");
         assert_eq!(detail.total_episodes, "500");
         assert_eq!(detail.director, "Hayato Date");
-        assert_eq!(detail.casts, vec!["Junko Takeuchi", "Noriaki Sugiyama", "Chie Nakamura"]);
+        assert_eq!(
+            detail.casts,
+            vec!["Junko Takeuchi", "Noriaki Sugiyama", "Chie Nakamura"]
+        );
         assert_eq!(detail.genres, vec!["Action", "Adventure", "Martial Arts"]);
         assert!(detail.synopsis.contains("Naruto Uzumaki"));
-        
+
         // Check episodes
         assert_eq!(detail.episodes.len(), 2);
         assert_eq!(detail.episodes[0].number, "500");
         assert_eq!(detail.episodes[0].title, "The Message");
         assert_eq!(detail.episodes[0].url, "/naruto-shippuden-episode-500/");
         assert_eq!(detail.episodes[0].release_date, "Mar 23, 2017");
-        
+
         assert_eq!(detail.episodes[1].number, "499");
-        assert_eq!(detail.episodes[1].title, "The Outcome of the Secret Mission");
+        assert_eq!(
+            detail.episodes[1].title,
+            "The Outcome of the Secret Mission"
+        );
     }
 
     #[test]
@@ -1723,15 +1755,15 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let detail = parse_anime_detail(html);
-        
+
         // Required fields should be present
         assert_eq!(detail.title, "Minimal Anime");
         assert_eq!(detail.poster, "https://example.com/poster.jpg");
         assert_eq!(detail.status, "Ongoing");
         assert_eq!(detail.anime_type, "TV");
-        
+
         // Optional fields should be empty strings
         assert_eq!(detail.alternate_titles, "");
         assert_eq!(detail.rating, "");
@@ -1760,7 +1792,7 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let detail = parse_anime_detail(html);
         assert_eq!(detail.poster, "https://example.com/lazy-poster.jpg");
     }
@@ -1799,9 +1831,9 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let detail = parse_anime_detail(html);
-        
+
         // Episodes should be in the same order as HTML (newest first)
         assert_eq!(detail.episodes.len(), 3);
         assert_eq!(detail.episodes[0].number, "3");
@@ -1828,19 +1860,17 @@ mod tests {
             casts: vec!["Actor 1".to_string(), "Actor 2".to_string()],
             genres: vec!["Action".to_string(), "Adventure".to_string()],
             synopsis: "Test synopsis".to_string(),
-            episodes: vec![
-                Episode {
-                    slug: "ep-1".to_string(),
-                    number: "1".to_string(),
-                    title: "Episode 1".to_string(),
-                    url: "/ep-1/".to_string(),
-                    release_date: "Jan 1, 2024".to_string(),
-                },
-            ],
+            episodes: vec![Episode {
+                slug: "ep-1".to_string(),
+                number: "1".to_string(),
+                title: "Episode 1".to_string(),
+                url: "/ep-1/".to_string(),
+                release_date: "Jan 1, 2024".to_string(),
+            }],
         };
-        
+
         let json = serde_json::to_string(&detail).unwrap();
-        
+
         // Verify camelCase serialization
         assert!(json.contains("\"alternateTitles\""));
         assert!(json.contains("\"trailerUrl\""));
@@ -1858,9 +1888,9 @@ mod tests {
             url: "/anime/test/episode-1/".to_string(),
             release_date: "Jan 1, 2024".to_string(),
         };
-        
+
         let json = serde_json::to_string(&episode).unwrap();
-        
+
         // Verify camelCase serialization
         assert!(json.contains("\"slug\""));
         assert!(json.contains("\"number\""));
@@ -1891,7 +1921,7 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let episodes = parse_episode_list(html);
         assert!(episodes.is_empty());
     }
@@ -1915,10 +1945,10 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let episodes = parse_episode_list(html);
         assert_eq!(episodes.len(), 1);
-        
+
         let ep = &episodes[0];
         assert_eq!(ep.number, "1");
         assert_eq!(ep.title, "The Beginning");
@@ -1959,17 +1989,17 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let episodes = parse_episode_list(html);
         assert_eq!(episodes.len(), 3);
-        
+
         // Episodes should maintain order (newest first as they appear in HTML)
         assert_eq!(episodes[0].number, "3");
         assert_eq!(episodes[0].title, "Episode Three");
-        
+
         assert_eq!(episodes[1].number, "2");
         assert_eq!(episodes[1].title, "Episode Two");
-        
+
         assert_eq!(episodes[2].number, "1");
         assert_eq!(episodes[2].title, "Episode One");
     }
@@ -2008,9 +2038,9 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let episodes = parse_episode_list(html);
-        
+
         // Verify order is preserved (newest first)
         assert_eq!(episodes.len(), 3);
         assert_eq!(episodes[0].number, "10");
@@ -2035,10 +2065,10 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let episodes = parse_episode_list(html);
         assert_eq!(episodes.len(), 1);
-        
+
         let ep = &episodes[0];
         assert_eq!(ep.number, "1");
         assert_eq!(ep.url, "/anime-episode-1/");
@@ -2059,7 +2089,7 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let episodes = parse_episode_list(html);
         assert!(episodes.is_empty());
     }
@@ -2083,7 +2113,7 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let episodes = parse_episode_list(html);
         assert_eq!(episodes.len(), 1);
         assert_eq!(episodes[0].title, "Episode 1: The Beginning & The End");
@@ -2108,10 +2138,10 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let episodes = parse_episode_list(html);
         assert_eq!(episodes.len(), 1);
-        
+
         // Whitespace should be trimmed
         assert_eq!(episodes[0].number, "1");
         assert_eq!(episodes[0].title, "Episode Title");
@@ -2124,7 +2154,7 @@ mod tests {
     fn test_parse_episode_detail_empty_html() {
         let html = "<html><body></body></html>";
         let detail = parse_episode_detail(html);
-        
+
         assert_eq!(detail.title, "");
         assert_eq!(detail.default_video, "");
         assert!(detail.sources.is_empty());
@@ -2139,7 +2169,7 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let detail = parse_episode_detail(html);
         assert_eq!(detail.title, "Naruto Episode 1");
         assert_eq!(detail.default_video, "");
@@ -2160,7 +2190,7 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let detail = parse_episode_detail(html);
         assert_eq!(detail.title, "Test Episode");
         assert_eq!(detail.default_video, "https://example.com/video.mp4");
@@ -2169,15 +2199,14 @@ mod tests {
     #[test]
     fn test_parse_episode_detail_with_video_sources() {
         // Base64 encode: <source src="https://example.com/720p.mp4" />
-        let encoded_720p = base64::engine::general_purpose::STANDARD.encode(
-            r#"<source src="https://example.com/720p.mp4" />"#
-        );
+        let encoded_720p = base64::engine::general_purpose::STANDARD
+            .encode(r#"<source src="https://example.com/720p.mp4" />"#);
         // Base64 encode: <source src="https://example.com/480p.mp4" />
-        let encoded_480p = base64::engine::general_purpose::STANDARD.encode(
-            r#"<source src="https://example.com/480p.mp4" />"#
-        );
-        
-        let html = format!(r#"
+        let encoded_480p = base64::engine::general_purpose::STANDARD
+            .encode(r#"<source src="https://example.com/480p.mp4" />"#);
+
+        let html = format!(
+            r#"
         <html>
         <body>
             <h1 class="entry-title">Test Episode</h1>
@@ -2188,16 +2217,17 @@ mod tests {
             </select>
         </body>
         </html>
-        "#);
-        
+        "#
+        );
+
         let detail = parse_episode_detail(&html);
         assert_eq!(detail.title, "Test Episode");
         assert_eq!(detail.sources.len(), 2);
-        
+
         assert_eq!(detail.sources[0].server, "SOKUJA");
         assert_eq!(detail.sources[0].quality, "720p");
         assert_eq!(detail.sources[0].url, "https://example.com/720p.mp4");
-        
+
         assert_eq!(detail.sources[1].server, "SOKUJA");
         assert_eq!(detail.sources[1].quality, "480p");
         assert_eq!(detail.sources[1].url, "https://example.com/480p.mp4");
@@ -2206,11 +2236,11 @@ mod tests {
     #[test]
     fn test_parse_episode_detail_with_iframe_source() {
         // Base64 encode: <iframe src="https://player.example.com/embed/123" />
-        let encoded = base64::engine::general_purpose::STANDARD.encode(
-            r#"<iframe src="https://player.example.com/embed/123" />"#
-        );
-        
-        let html = format!(r#"
+        let encoded = base64::engine::general_purpose::STANDARD
+            .encode(r#"<iframe src="https://player.example.com/embed/123" />"#);
+
+        let html = format!(
+            r#"
         <html>
         <body>
             <h1 class="entry-title">Test Episode</h1>
@@ -2219,13 +2249,17 @@ mod tests {
             </select>
         </body>
         </html>
-        "#);
-        
+        "#
+        );
+
         let detail = parse_episode_detail(&html);
         assert_eq!(detail.sources.len(), 1);
         assert_eq!(detail.sources[0].server, "External Player");
         assert_eq!(detail.sources[0].quality, "1080p");
-        assert_eq!(detail.sources[0].url, "https://player.example.com/embed/123");
+        assert_eq!(
+            detail.sources[0].url,
+            "https://player.example.com/embed/123"
+        );
     }
 
     #[test]
@@ -2241,7 +2275,7 @@ mod tests {
         </body>
         </html>
         "#;
-        
+
         let detail = parse_episode_detail(html);
         assert_eq!(detail.title, "Test Episode");
         // Invalid base64 should be skipped gracefully
@@ -2251,11 +2285,11 @@ mod tests {
     #[test]
     fn test_parse_episode_detail_mixed_valid_invalid() {
         // One valid, one invalid
-        let encoded_valid = base64::engine::general_purpose::STANDARD.encode(
-            r#"<source src="https://example.com/valid.mp4" />"#
-        );
-        
-        let html = format!(r#"
+        let encoded_valid = base64::engine::general_purpose::STANDARD
+            .encode(r#"<source src="https://example.com/valid.mp4" />"#);
+
+        let html = format!(
+            r#"
         <html>
         <body>
             <h1 class="entry-title">Test Episode</h1>
@@ -2265,8 +2299,9 @@ mod tests {
             </select>
         </body>
         </html>
-        "#);
-        
+        "#
+        );
+
         let detail = parse_episode_detail(&html);
         // Only valid source should be parsed
         assert_eq!(detail.sources.len(), 1);
@@ -2276,11 +2311,11 @@ mod tests {
     #[test]
     fn test_parse_episode_detail_no_url_in_decoded_html() {
         // Base64 encode HTML without any video URL
-        let encoded = base64::engine::general_purpose::STANDARD.encode(
-            r#"<div>No video here</div>"#
-        );
-        
-        let html = format!(r#"
+        let encoded =
+            base64::engine::general_purpose::STANDARD.encode(r#"<div>No video here</div>"#);
+
+        let html = format!(
+            r#"
         <html>
         <body>
             <h1 class="entry-title">Test Episode</h1>
@@ -2289,8 +2324,9 @@ mod tests {
             </select>
         </body>
         </html>
-        "#);
-        
+        "#
+        );
+
         let detail = parse_episode_detail(&html);
         // Source without URL should be skipped
         assert!(detail.sources.is_empty());
@@ -2393,7 +2429,7 @@ mod tests {
             quality: "720p".to_string(),
             url: "https://example.com/video.mp4".to_string(),
         };
-        
+
         let json = serde_json::to_string(&source).unwrap();
         // Verify camelCase serialization
         assert!(json.contains("\"server\""));
@@ -2406,15 +2442,13 @@ mod tests {
         let detail = EpisodeDetail {
             title: "Test Episode".to_string(),
             default_video: "https://example.com/default.mp4".to_string(),
-            sources: vec![
-                VideoSource {
-                    server: "SOKUJA".to_string(),
-                    quality: "720p".to_string(),
-                    url: "https://example.com/720p.mp4".to_string(),
-                },
-            ],
+            sources: vec![VideoSource {
+                server: "SOKUJA".to_string(),
+                quality: "720p".to_string(),
+                url: "https://example.com/720p.mp4".to_string(),
+            }],
         };
-        
+
         let json = serde_json::to_string(&detail).unwrap();
         // Verify camelCase serialization
         assert!(json.contains("\"title\""));
@@ -2422,7 +2456,6 @@ mod tests {
         assert!(json.contains("\"sources\""));
     }
 }
-
 
 #[cfg(test)]
 mod property_tests {
@@ -2506,7 +2539,13 @@ mod property_tests {
     ) -> String {
         let genre_html: String = genres
             .iter()
-            .map(|g| format!(r#"<a rel="tag" href="/genre/{0}/">{1}</a>"#, g.to_lowercase(), g))
+            .map(|g| {
+                format!(
+                    r#"<a rel="tag" href="/genre/{0}/">{1}</a>"#,
+                    g.to_lowercase(),
+                    g
+                )
+            })
             .collect::<Vec<_>>()
             .join("\n");
 
@@ -2549,12 +2588,12 @@ mod property_tests {
 
     proptest! {
         /// Property 2: Completed Anime Parsing Completeness
-        /// 
+        ///
         /// For any valid HTML containing `article.stylesix` elements, the parser SHALL extract
         /// all completed anime entries with non-null values for: title, url, thumbnail, type,
         /// episodeCount, status, genres (array), and rating. Missing elements should result
         /// in empty strings or empty arrays.
-        /// 
+        ///
         /// **Validates: Requirements 3.1-3.10**
         #[test]
         fn property_completed_anime_parsing_completeness(
@@ -2595,7 +2634,7 @@ mod property_tests {
 
             // All fields should be non-null (not Option::None)
             // In Rust, String is never null, so we verify they match expected values
-            
+
             // Required fields should match input
             prop_assert_eq!(&anime.title, &title, "Title mismatch");
             prop_assert_eq!(&anime.url, &url, "URL mismatch");
@@ -2621,7 +2660,7 @@ mod property_tests {
         }
 
         /// Property: Empty HTML returns empty array
-        /// 
+        ///
         /// For any HTML without article.stylesix elements, the parser should return an empty array.
         #[test]
         fn property_empty_html_returns_empty_array(
@@ -2633,7 +2672,7 @@ mod property_tests {
         }
 
         /// Property: Missing elements default to empty values
-        /// 
+        ///
         /// For any HTML with article.stylesix but missing child elements,
         /// the parser should use empty strings/arrays as defaults.
         #[test]
@@ -2658,10 +2697,10 @@ mod property_tests {
             prop_assert_eq!(result.len(), 1, "Expected exactly one completed anime");
 
             let anime = &result[0];
-            
+
             // Title should be parsed
             prop_assert_eq!(&anime.title, &title, "Title should be parsed");
-            
+
             // Missing elements should default to empty strings/arrays
             prop_assert!(anime.thumbnail.is_empty(), "Missing thumbnail should be empty string");
             prop_assert!(anime.anime_type.is_empty(), "Missing type should be empty string");
